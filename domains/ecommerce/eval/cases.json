@@ -1,0 +1,170 @@
+{
+  "domain": "ecommerce",
+  "version": "0.1",
+  "note": "本文件只新增,不替代 eval/cases.json。checks 使用现有 eval/run_eval.py 支持的键;metrics/datasets/tolerance 是领域扩展字段,现有执行器会忽略。",
+  "cases": [
+    {
+      "id": "ec_daily_gmv_trend",
+      "question": "按天看 orders.csv 的 GMV 趋势并画图",
+      "metrics": ["gmv", "order_count", "aov"],
+      "datasets": ["orders.csv", "users.csv"],
+      "checks": {
+        "final_contains": ["GMV", "订单数", "支付金额", "测试单"],
+        "final_not_empty": true,
+        "charts_min": 1,
+        "report_sections": [
+          "## 一句话结论",
+          "## 关键发现",
+          "## 建议",
+          "## 局限与数据质量",
+          "## 口径与数据版本"
+        ]
+      },
+      "tolerance": {"metric": "gmv", "value": 1193284.77, "rel_tol": 0.01}
+    },
+    {
+      "id": "ec_channel_conversion_funnel",
+      "question": "用 traffic.csv 对比线下门店、线上商城、小程序、直播的支付转化率",
+      "metrics": ["pay_conversion_rate", "cart_add_rate"],
+      "datasets": ["traffic.csv"],
+      "checks": {
+        "final_contains": ["线上商城", "小程序", "支付转化率"],
+        "final_not_empty": true,
+        "charts_min": 1
+      },
+      "tolerance": {"metric": "pay_conversion_rate", "value": 0.044015, "rel_tol": 0.02}
+    },
+    {
+      "id": "ec_category_gmv_mix",
+      "question": "结合 orders.csv、order_items.csv 和 products.csv 看各品类的 GMV 占比",
+      "metrics": ["gmv", "attach_rate"],
+      "datasets": ["orders.csv", "order_items.csv", "products.csv"],
+      "checks": {
+        "final_contains": ["GMV", "品类"],
+        "final_not_empty": true,
+        "charts_min": 1
+      },
+      "tolerance": null
+    },
+    {
+      "id": "ec_price_band",
+      "question": "结合 products.csv 和 order_items.csv 看不同价格带的销量和客单价",
+      "metrics": ["aov", "order_count", "gmv"],
+      "datasets": ["products.csv", "order_items.csv"],
+      "checks": {
+        "final_contains": ["价格带"],
+        "final_not_empty": true,
+        "charts_min": 1
+      },
+      "tolerance": null
+    },
+    {
+      "id": "ec_new_vs_old_aov",
+      "question": "orders.csv 里新客和老客的客单价、GMV 差多少，并画图对比",
+      "metrics": ["new_customer_ratio", "aov", "gmv"],
+      "datasets": ["orders.csv", "users.csv"],
+      "checks": {
+        "final_contains": ["新客", "老客"],
+        "final_not_empty": true,
+        "charts_min": 1
+      },
+      "tolerance": {"metric": "new_customer_ratio", "value": 0.5953, "rel_tol": 0.03}
+    },
+    {
+      "id": "ec_repurchase_rate",
+      "question": "orders.csv 的复购率是多少",
+      "metrics": ["repurchase_rate"],
+      "datasets": ["orders.csv", "users.csv"],
+      "checks": {
+        "final_contains": ["复购率", "支付金额", "测试单"],
+        "final_not_empty": true
+      },
+      "tolerance": {"metric": "repurchase_rate", "value": 0.4583, "rel_tol": 0.03}
+    },
+    {
+      "id": "ec_repurchase_interval",
+      "question": "orders.csv 中用户复购间隔的中位数是多少",
+      "metrics": ["repurchase_interval"],
+      "datasets": ["orders.csv"],
+      "checks": {
+        "final_contains": ["复购间隔", "中位数"],
+        "final_not_empty": true
+      },
+      "tolerance": null
+    },
+    {
+      "id": "ec_cohort_retention",
+      "question": "按首单月份看 orders.csv 用户的 cohort 留存",
+      "metrics": ["repurchase_rate", "new_customer_ratio"],
+      "datasets": ["orders.csv"],
+      "checks": {
+        "final_contains": ["cohort", "留存"],
+        "final_not_empty": true,
+        "charts_min": 1
+      },
+      "tolerance": null
+    },
+    {
+      "id": "ec_rfm_segments",
+      "question": "对 orders.csv 的用户做 RFM 分层，并说明各层特征",
+      "metrics": ["gmv", "order_count", "repurchase_interval"],
+      "datasets": ["orders.csv"],
+      "checks": {
+        "final_contains": ["RFM"],
+        "final_not_empty": true,
+        "charts_min": 1
+      },
+      "tolerance": null
+    },
+    {
+      "id": "ec_ab_pay_conversion",
+      "question": "分析 traffic.csv 中线上商城实验组与对照组的支付转化率差异",
+      "metrics": ["pay_conversion_rate", "cart_add_rate"],
+      "datasets": ["traffic.csv"],
+      "checks": {
+        "summary_contains": ["p 值", "置信区间", "相对提升", "实验组", "对照组"],
+        "final_not_empty": true,
+        "charts_min": 1
+      },
+      "tolerance": {"metric": "ab_relative_lift", "value": 0.2065, "rel_tol": 0.10}
+    },
+    {
+      "id": "ec_refund_rate",
+      "question": "orders.csv 的退款率是多少，按渠道拆一下",
+      "metrics": ["refund_rate", "gmv"],
+      "datasets": ["orders.csv", "users.csv"],
+      "checks": {
+        "final_contains": ["退款率", "渠道", "订单口径", "金额口径"],
+        "final_not_empty": true,
+        "charts_min": 1
+      },
+      "tolerance": {"metric": "refund_rate", "value": 0.050959, "rel_tol": 0.05}
+    },
+    {
+      "id": "ec_dirty_orders",
+      "question": "检查 orders.csv 里的测试单、刷单和 0 元单占比",
+      "metrics": ["order_count", "gmv"],
+      "datasets": ["orders.csv"],
+      "checks": {
+        "final_contains": ["测试单", "刷单", "0 元单"],
+        "final_not_empty": true,
+        "report_sections": [
+          "## 局限与数据质量",
+          "## 口径与数据版本"
+        ]
+      },
+      "tolerance": null
+    },
+    {
+      "id": "ec_missing_users",
+      "question": "orders.csv 的 GMV 是多少",
+      "metrics": ["gmv"],
+      "datasets": ["orders.csv"],
+      "checks": {
+        "final_contains_any": ["缺少", "无法"],
+        "final_not_empty": true
+      },
+      "tolerance": null
+    }
+  ]
+}

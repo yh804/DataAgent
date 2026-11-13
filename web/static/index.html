@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>数据分析 Agent</title>
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <script src="/static/vendor/marked.min.js?v=20261113b"></script>
+  <script src="/static/vendor/purify.min.js?v=20261113b"></script>
+  <link rel="stylesheet" href="/static/theme.css?v=20261113b" />
+</head>
+<body class="bg-slate-100 text-slate-800 h-screen flex overflow-hidden">
+
+  <!-- 移动端遮罩:点击关闭侧栏 -->
+  <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+
+  <!-- 左侧分组导航 -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-brand">
+      <h1 class="sidebar-title">数据分析 Agent</h1>
+      <button id="btnNewSession" class="btn-primary w-full text-sm">+ 新建会话</button>
+    </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-group-title">当前分析</div>
+      <nav id="navAnalysis" aria-label="当前分析">
+        <button type="button" class="nav-item" data-view="chat">
+          <span class="nav-icon" aria-hidden="true">💬</span>
+          <span class="nav-label">对话</span>
+        </button>
+        <button type="button" class="nav-item" data-view="report">
+          <span class="nav-icon" aria-hidden="true">📄</span>
+          <span class="nav-label">报告</span>
+        </button>
+        <button type="button" class="nav-item" data-view="charts">
+          <span class="nav-icon" aria-hidden="true">📊</span>
+          <span class="nav-label">图表</span>
+        </button>
+        <button type="button" class="nav-item" data-view="code">
+          <span class="nav-icon" aria-hidden="true">📜</span>
+          <span class="nav-label">代码</span>
+        </button>
+        <button type="button" class="nav-item" data-view="trace">
+          <span class="nav-icon" aria-hidden="true">⏱</span>
+          <span class="nav-label">Trace</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-group-title">资源</div>
+      <nav aria-label="资源">
+        <button type="button" class="nav-item" data-view="databases">
+          <span class="nav-icon" aria-hidden="true">🗄</span>
+          <span class="nav-label">数据库</span>
+          <span class="nav-count" id="dbCount">0</span>
+        </button>
+        <button type="button" class="nav-item" data-view="history">
+          <span class="nav-icon" aria-hidden="true">🕘</span>
+          <span class="nav-label">历史</span>
+          <span class="nav-count" id="historyCount">0</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="sidebar-group sidebar-status">
+      <div class="sidebar-group-title">系统</div>
+      <button id="btnSettings" type="button" class="nav-item nav-item-mini">
+        <span class="nav-icon" aria-hidden="true">⚙️</span>
+        <span class="nav-label">模型设置</span>
+      </button>
+      <div class="status-row"><span class="dot" id="dotLlm"></span><span id="badgeLlm">LLM —</span></div>
+      <div class="status-row"><span class="dot" id="dotDocker"></span><span id="badgeDocker">Docker —</span></div>
+      <div class="status-row"><span class="dot" id="dotCkpt"></span><span id="badgeCkpt">检查点 —</span></div>
+    </div>
+
+    <div id="llmFooter" class="sidebar-llm-footer">模型: 未配置</div>
+  </aside>
+
+  <!-- 主内容区 -->
+  <main id="mainArea" class="flex-1 min-w-0 flex flex-col">
+    <!-- 移动端工具条 -->
+    <div class="mobile-bar">
+      <button id="btnMenu" class="drawer-btn" type="button" title="菜单">☰</button>
+      <span id="mobileTitle" class="text-sm font-semibold">对话</span>
+    </div>
+
+    <!-- 对话视图 -->
+    <section id="chatView" class="flex-1 min-h-0 flex flex-col relative">
+      <div id="llmBanner" class="llm-banner hidden">请先在 ⚙️ 模型设置里填入 API Key</div>
+      <div id="chatMain" class="relative flex-1 min-w-0 flex flex-col min-h-0">
+        <div id="dropOverlay" class="drop-overlay hidden">
+          <div class="drop-overlay-text">松开上传</div>
+        </div>
+        <div id="chatFlow" class="flex-1 overflow-y-auto p-4 space-y-4">
+          <div class="empty-hint" id="chatEmpty">点输入框左侧 📎 上传 CSV / Excel / JSON,或把文件拖进这个区域,然后提问</div>
+        </div>
+        <div class="p-3 bg-white border-t border-slate-200 shrink-0">
+          <div id="composer" class="composer">
+            <div id="attachBar" class="attach-bar hidden">
+              <span id="attachChip" class="attach-chip hidden"></span>
+              <span id="dbChip" class="attach-chip db-chip hidden"></span>
+              <span id="attachHint" class="attach-hint"></span>
+            </div>
+            <div class="flex items-end gap-2">
+              <button id="btnAttach" type="button" class="attach-btn" title="上传或选择数据源">📎</button>
+              <textarea id="questionInput" rows="2" class="flex-1 border-0 bg-transparent px-1 py-2 text-sm focus:outline-none resize-none" placeholder="输入你的数据分析问题…(Enter 发送,Shift+Enter 换行)"></textarea>
+              <button id="btnSend" class="btn-primary self-end">发送</button>
+            </div>
+            <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.json" class="hidden" />
+            <div id="attachMenu" class="attach-menu hidden"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 结果视图 -->
+    <section id="resultView" class="hidden flex-1 min-h-0 flex-col">
+      <div class="result-toolbar">
+        <div class="result-meta truncate" id="resultMeta">数据源 · 问题 · run_id</div>
+        <div class="flex gap-2 shrink-0">
+          <a id="btnDownloadHtml" class="btn-ghost text-xs" href="#" download>下载 HTML</a>
+          <a id="btnDownloadCsv" class="btn-ghost text-xs" href="#" download>下载 CSV</a>
+          <button type="button" id="btnBackChat" class="btn-ghost text-xs">← 返回对话</button>
+        </div>
+      </div>
+      <div class="result-body">
+        <div id="tab-report" class="result-pane prose prose-sm md-body"></div>
+        <div id="tab-charts" class="result-pane hidden"></div>
+        <div id="tab-code" class="result-pane hidden"><pre class="code-block"><code id="codeContent"></code></pre></div>
+        <div id="tab-trace" class="result-pane hidden"></div>
+      </div>
+    </section>
+
+    <!-- 数据库视图:整页连接列表 -->
+    <section id="databaseView" class="hidden flex-1 min-h-0 flex-col">
+      <div class="view-header">
+        <h2 class="view-title">数据库</h2>
+        <button id="btnAddDatabase" type="button" class="btn-primary text-sm">+ 添加数据库</button>
+      </div>
+      <div class="db-layout">
+        <aside class="db-layout-side">
+          <ul id="databaseList" class="db-list"></ul>
+        </aside>
+        <div id="dbDetail" class="db-layout-main db-placeholder">
+          <div class="db-detail-head">
+            <h3 id="dbBrowserTitle">选择左侧的连接查看表结构</h3>
+            <button id="btnDbBrowserClose" type="button" class="btn-ghost text-xs hidden">关闭</button>
+          </div>
+          <div class="db-detail-body">
+            <ul id="dbTableList" class="db-table-list"></ul>
+            <div id="dbColumns" class="db-columns">从左侧选择一张表或视图</div>
+          </div>
+          <div class="db-detail-actions">
+            <button id="btnDbUse" type="button" class="btn-primary text-sm hidden">用这个库提问</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 历史视图:会话与运行记录两栏 -->
+    <section id="historyView" class="hidden flex-1 min-h-0 flex-col">
+      <div class="view-header">
+        <h2 class="view-title">历史</h2>
+        <button id="btnClearRuns" type="button" class="sidebar-clear">清空运行记录</button>
+      </div>
+      <div class="history-grid" id="historyGrid">
+        <div class="history-col">
+          <h3 class="history-col-title">会话 <span id="sessionCount" class="nav-count">0</span></h3>
+          <ul id="sessionList" class="sidebar-list"></ul>
+        </div>
+        <div class="history-col">
+          <h3 class="history-col-title">数据库查询 <span id="dbQueryCount" class="nav-count">0</span></h3>
+          <ul id="dbQueryList" class="sidebar-list text-xs"></ul>
+          <h3 class="history-col-title history-sub-title">运行记录 <span id="runCount" class="nav-count">0</span></h3>
+          <ul id="runList" class="sidebar-list text-xs"></ul>
+        </div>
+        <div class="history-col history-detail hidden" id="dbQueryDetail"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 图片放大遮罩 -->
+  <div id="imgModal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6">
+    <img id="imgModalImg" class="max-w-full max-h-full rounded-lg shadow-2xl" />
+  </div>
+
+  <!-- 通用确认弹窗 -->
+  <div id="confirmModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-5">
+      <h3 id="confirmTitle" class="text-base font-semibold text-slate-800 mb-2">确认</h3>
+      <div id="confirmBody" class="text-sm text-slate-600 mb-4"></div>
+      <div class="flex justify-end gap-2">
+        <button id="confirmCancel" class="btn-ghost">取消</button>
+        <button id="confirmOk" class="btn-primary">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加 / 编辑数据库连接 -->
+  <div id="dbModal" class="hidden db-modal">
+    <div class="db-modal-box">
+      <div class="flex items-center justify-between mb-3">
+        <h3 id="dbModalTitle" class="text-base font-semibold text-slate-800">添加 MySQL 数据库</h3>
+        <button id="btnDbClose" type="button" class="btn-ghost text-xs">关闭</button>
+      </div>
+      <form id="dbForm" class="db-form" autocomplete="off">
+        <label class="db-field">
+          <span>名称</span>
+          <input id="dbLabel" name="label" type="text" placeholder="例如 电商生产库" required />
+        </label>
+        <div class="db-form-row">
+          <label class="db-field">
+            <span>主机</span>
+            <input id="dbHost" name="host" type="text" placeholder="127.0.0.1" required />
+          </label>
+          <label class="db-field db-field-port">
+            <span>端口</span>
+            <input id="dbPort" name="port" type="number" value="3306" min="1" max="65535" />
+          </label>
+        </div>
+        <label class="db-field">
+          <span>库名</span>
+          <input id="dbName" name="database" type="text" placeholder="ecommerce" required />
+        </label>
+        <label class="db-field">
+          <span>用户名</span>
+          <input id="dbUser" name="user" type="text" placeholder="agent_ro" required />
+        </label>
+        <label class="db-field">
+          <span>密码</span>
+          <input id="dbPassword" name="password" type="password" placeholder="只存服务端,不会下发浏览器" />
+        </label>
+        <label class="db-check">
+          <input id="dbSsl" name="ssl" type="checkbox" />
+          <span>使用 SSL 连接</span>
+        </label>
+        <div id="dbTestResult" class="db-test-result hidden"></div>
+        <div class="db-form-actions">
+          <button id="btnDbTest" type="button" class="btn-ghost text-sm">测试连接</button>
+          <button id="btnDbSave" type="submit" class="btn-primary text-sm">保存</button>
+        </div>
+        <p class="db-form-tip">密码仅保存在服务端 outputs/db_credentials.json;编辑时留空表示不修改。</p>
+      </form>
+    </div>
+  </div>
+
+  <!-- 模型设置(BYOK):密钥只存 localStorage,不发往服务端持久化 -->
+  <div id="settingsModal" class="hidden db-modal">
+    <div class="db-modal-box">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-semibold text-slate-800">⚙️ 模型设置</h3>
+        <button id="btnCloseSettings" type="button" class="btn-ghost text-xs">关闭</button>
+      </div>
+      <form id="settingsForm" class="db-form" autocomplete="off">
+        <label class="db-field">
+          <span>API Key</span>
+          <div class="settings-key-row">
+            <input id="llmKey" type="password" placeholder="sk-..." autocomplete="new-password" />
+            <button id="btnToggleKey" type="button" class="btn-ghost text-xs">显示</button>
+          </div>
+        </label>
+        <label class="db-field">
+          <span>Base URL</span>
+          <input id="llmBase" type="text" value="https://api.deepseek.com/v1" placeholder="https://api.deepseek.com/v1" />
+        </label>
+        <label class="db-field">
+          <span>Model</span>
+          <input id="llmModel" type="text" value="deepseek-chat" placeholder="deepseek-chat" />
+        </label>
+        <p class="db-form-tip">密钥只保存在本浏览器（localStorage），不会上传服务器保存。</p>
+        <div id="llmTestResult" class="db-test-result hidden"></div>
+        <div class="db-form-actions">
+          <button id="btnTestLlm" type="button" class="btn-ghost text-sm">测试连接</button>
+          <button id="btnClearLlm" type="button" class="btn-ghost text-sm">清除</button>
+          <button id="btnSaveLlm" type="submit" class="btn-primary text-sm">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=20261113b"></script>
+</body>
+</html>

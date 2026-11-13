@@ -1,0 +1,4 @@
+# 开发依赖：不参与生产运行,只在本地开发 / CI 使用
+# 安装：pip install -r requirements.txt -r requirements-dev.txt
+pytest==9.2.0
+ruff==0.17.3

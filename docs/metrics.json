@@ -1,0 +1,49 @@
+{
+  "generated_at": "2026-11-05T15:15:24",
+  "tests": {
+    "collected": null
+  },
+  "eval": {
+    "total": 9,
+    "passed": 9,
+    "failed": 0,
+    "timestamp": "2026-11-04T22:14:02",
+    "file": "eval_report_20261104_221402.json"
+  },
+  "runs": {
+    "total": 9,
+    "success": 9,
+    "success_rate": 1.0,
+    "duration_p50_ms": 6445.0,
+    "duration_mean_ms": 5193.777777777777,
+    "duration_samples": 9,
+    "token_mean": 8604.111111111111,
+    "token_samples": 9
+  },
+  "approvals": {
+    "total": 84,
+    "auto": 7,
+    "auto_ratio": 0.08333333333333333,
+    "confirm": 77,
+    "confirm_ratio": 0.9166666666666666,
+    "human_reject": 4
+  },
+  "sessions": {
+    "total": 7,
+    "deleted": 19
+  },
+  "entries": 5,
+  "params": {
+    "machine": "Windows 11 (AMD64)",
+    "python": "3.13.9",
+    "docker": "29.8.2",
+    "model": "deepseek-chat",
+    "samples": {
+      "runs": 9,
+      "approvals": 84,
+      "sessions": 7,
+      "eval": 9,
+      "tests": 0
+    }
+  }
+}

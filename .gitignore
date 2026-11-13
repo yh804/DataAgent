@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# 虚拟环境
+.venv/
+.venv_test/
+
+# 密钥与本地配置(禁止提交真实 .env)
+.env
+
+# 运行产物与临时目录
+outputs/
+.tmp_analyze/
+.tmp_*
+.screenshots/
+.archify/
+*.bak
+*.sqlite
+*.log
+
+# 用户上传的数据集(仓库只保留演示与回归样例)
+data/processed/*.csv
+!data/processed/demo_sales.csv
+!data/processed/demo_users_pii.csv
+!data/processed/测试数据.csv

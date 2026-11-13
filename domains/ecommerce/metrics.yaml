@@ -1,0 +1,457 @@
+version: "0.1"
+domain: ecommerce
+updated: "2026-11-06"
+data_dir: domains/ecommerce/examples
+status_legend:
+  confirmed: "口径已由业务确认,可直接用于对外报告"
+  draft: "口径存在业务决策项,使用前必须确认 open_questions 中的选项"
+
+metrics:
+  - id: gmv
+    name: GMV
+    category: 规模
+    formula: "SUM(orders.支付金额),筛选 orders.支付时间 非空且 orders.订单状态 属于 已支付/已发货/已完成/退款中/已退款,并排除测试单、刷单、内部账号与测试账号订单。"
+    grain: 订单级汇总
+    required_columns:
+      - orders.支付金额
+      - orders.支付时间
+      - orders.订单状态
+      - orders.订单日期
+      - orders.是否测试单
+      - orders.是否刷单
+      - orders.用户ID
+      - users.是否内部账号
+      - users.是否测试账号
+    filters:
+      - "排除 orders.是否测试单 = 是"
+      - "排除 orders.是否刷单 = 是"
+      - "排除 users.是否内部账号 = 是"
+      - "排除 users.是否测试账号 = 是"
+      - "排除 orders.订单状态 属于 待支付/已取消"
+    dimensions:
+      - 订单日期
+      - 支付日期
+      - 渠道
+      - 地区
+      - 品类
+      - 新客
+    time_window: "默认自然月;支持日、周、月、季。趋势图默认按订单日期,口径需在报告中声明。"
+    edge_cases:
+      - "全额退款订单:当前公式仍计入 GMV,同时必须单独报告退款率。"
+      - "0 元单:支付金额为 0,对 GMV 无贡献,但计入 order_count。"
+      - "异常金额单:只报告不删除,需在「局限与数据质量」中列出。"
+      - "支付时间缺失但订单状态为已支付:视为脏数据,按测试单同级别告警。"
+    clock: "payment"
+    status: draft
+    open_questions:
+      - question: "GMV 是否扣除退款?"
+        options:
+          - "不扣退款,采用支付口径(毛 GMV),另行报告退款率"
+          - "扣除已退款金额,采用净 GMV"
+          - "按发货口径,只计已发货/已完成订单"
+      - question: "GMV 按下单日还是支付日归属?"
+        options:
+          - "按订单日期(下单日)"
+          - "按支付时间(支付日)"
+      - question: "GMV 是否含运费、是否用优惠前金额?"
+        options:
+          - "含运费、优惠后实付金额(当前公式)"
+          - "不含运费、优惠后商品金额"
+          - "优惠前商品金额(吊牌口径)"
+
+  - id: order_count
+    name: 订单数
+    category: 规模
+    formula: "COUNT(DISTINCT orders.订单号),筛选 orders.支付时间 非空且 orders.订单状态 属于 已支付/已发货/已完成/退款中/已退款,并排除测试单、刷单、内部账号与测试账号订单。"
+    grain: 订单级去重
+    required_columns:
+      - orders.订单号
+      - orders.支付时间
+      - orders.订单状态
+      - orders.是否测试单
+      - orders.是否刷单
+      - orders.用户ID
+      - users.是否内部账号
+      - users.是否测试账号
+    filters:
+      - "排除 orders.是否测试单 = 是"
+      - "排除 orders.是否刷单 = 是"
+      - "排除 users.是否内部账号 = 是"
+      - "排除 users.是否测试账号 = 是"
+      - "排除 orders.订单状态 属于 待支付/已取消"
+    dimensions:
+      - 订单日期
+      - 渠道
+      - 地区
+      - 新客
+      - 会员等级
+    time_window: "默认自然月;与 GMV 使用同一时间归属口径。"
+    edge_cases:
+      - "全额退款订单仍计为 1 单(发生过支付)。"
+      - "0 元单计为 1 单(支付时间为非空)。"
+      - "同一订单号不得重复计数,订单号是主键。"
+    clock: "payment"
+    status: confirmed
+
+  - id: aov
+    name: 客单价
+    category: 效率
+    formula: "aov = gmv / order_count,分子分母必须使用完全相同的筛选与时间窗口。"
+    grain: 订单级汇总
+    required_columns:
+      - orders.支付金额
+      - orders.订单号
+      - orders.订单状态
+      - orders.是否测试单
+      - orders.是否刷单
+      - orders.用户ID
+    filters:
+      - "继承 gmv 与 order_count 的全部过滤条件"
+    dimensions:
+      - 渠道
+      - 地区
+      - 品类
+      - 新客
+      - 会员等级
+    time_window: "默认自然月;分渠道时必须同时给出订单数,避免小样本误导。"
+    edge_cases:
+      - "分母为 0 时返回空值,不得写成 0 元。"
+      - "0 元单会拉低客单价,需注明 0 元单数量。"
+      - "异常金额单会显著抬高客单价,建议同时给中位数。"
+      - "含全额退款订单时客单价偏高,需与净口径并列。"
+    clock: "payment"
+    status: draft
+    open_questions:
+      - question: "客单价用毛 GMV 还是净 GMV?"
+        options:
+          - "毛 GMV / 支付订单数(当前公式)"
+          - "净 GMV / 支付订单数(扣除退款)"
+      - question: "客单价按订单还是按用户?"
+        options:
+          - "订单口径:GMV / 支付订单数"
+          - "用户口径:GMV / 支付用户数(即人均消费)"
+      - question: "是否必须同时拆分新老客?"
+        options:
+          - "是,新客与老客分别给客单价"
+          - "否,只给整体客单价"
+
+  - id: pay_conversion_rate
+    name: 支付转化率
+    category: 转化
+    formula: "SUM(traffic.支付人数) / SUM(traffic.访问人数),可分别按日期、渠道、实验组聚合;分母为 0 时返回空值。"
+    grain: 日期×渠道×实验组
+    required_columns:
+      - traffic.日期
+      - traffic.渠道
+      - traffic.实验组
+      - traffic.访问人数
+      - traffic.支付人数
+    filters:
+      - "同一日期、渠道、实验组只保留一行,禁止把实验组与对照组重复相加"
+      - "渠道为空的行不纳入渠道对比,但计入整体时需单列「未知渠道」"
+      - "访问人数为 0 的行不参与转化率计算"
+    dimensions:
+      - 日期
+      - 渠道
+      - 实验组
+      - 周
+      - 月
+    time_window: "默认按周;AB 实验按实验周期;趋势按日。"
+    edge_cases:
+      - "traffic 的访问人数是渠道级去重,orders 是订单样本,两者不能直接对账。"
+      - "跨渠道同一用户可能被重复计数,当前数据未提供跨渠道去重键。"
+      - "线下门店的「访问人数」定义与线上不同,跨渠道比较需注明。"
+      - "实验组仅覆盖线上商城,其他渠道为「未分流」。"
+    clock: "event"
+    status: draft
+    open_questions:
+      - question: "转化率分母用访问人数还是曝光人数?"
+        options:
+          - "访问人数(当前公式)"
+          - "曝光人数(曝光→支付全漏斗)"
+      - question: "是否按用户去重?"
+        options:
+          - "按人次,直接汇总 traffic 的计数列"
+          - "按用户去重,需要曝光/访问明细,当前数据未提供"
+      - question: "线下门店是否纳入渠道转化对比?"
+        options:
+          - "纳入,但单独标注口径不同"
+          - "不纳入,只比较三个线上渠道"
+
+  - id: refund_rate
+    name: 退款率
+    category: 质量
+    formula: "候选 A(订单口径)= 退款订单数 / 支付订单数;候选 B(金额口径)= SUM(orders.退款金额) / SUM(orders.支付金额)。报告默认同时展示 A 与 B。"
+    grain: 订单级
+    required_columns:
+      - orders.订单号
+      - orders.订单状态
+      - orders.是否退款
+      - orders.退款金额
+      - orders.支付金额
+      - orders.订单日期
+      - orders.是否测试单
+      - orders.是否刷单
+    filters:
+      - "排除 orders.是否测试单 = 是"
+      - "排除 orders.是否刷单 = 是"
+      - "分母只含发生过支付的订单"
+    dimensions:
+      - 订单日期
+      - 渠道
+      - 品类
+      - 地区
+      - 新客
+    time_window: "默认自然月;按订单日期归属,退款发生日无独立字段。"
+    edge_cases:
+      - "退款中的订单是否算退款,存在争议。"
+      - "数据没有退款时间列,跨月退款只能按原订单日期归属得。"
+      - "部分退款场景:当前数据只有全额退款与退款中两种。"
+      - "0 元单退款金额为 0,会计入订单口径但拉低金额口径。"
+    clock: "payment"
+    status: draft
+    open_questions:
+      - question: "主口径用订单口径还是金额口径?"
+        options:
+          - "订单口径:退款订单数 / 支付订单数(当前公式 A)"
+          - "金额口径:退款金额 / 支付金额(当前公式 B)"
+          - "两者并列,不指定主口径"
+      - question: "退款中的订单是否计入退款?"
+        options:
+          - "计入,按已发起退款处理"
+          - "不计入,只统计已退款"
+      - question: "跨期退款如何归属?"
+        options:
+          - "按原订单日期归属(当前数据唯一可行方案)"
+          - "补充退款时间字段后按退款日归属"
+
+  - id: repurchase_rate
+    name: 复购率
+    category: 留存
+    formula: "在统计窗口内,干净支付订单数 ≥ 2 的用户数 / 干净支付订单数 ≥ 1 的用户数。干净订单指排除测试单、刷单、内部账号、测试账号后的支付订单。"
+    grain: 用户级
+    required_columns:
+      - orders.用户ID
+      - orders.订单号
+      - orders.订单日期
+      - orders.支付时间
+      - orders.订单状态
+      - orders.是否测试单
+      - orders.是否刷单
+      - users.是否内部账号
+      - users.是否测试账号
+    filters:
+      - "排除测试单、刷单、内部账号、测试账号"
+      - "排除待支付与已取消订单"
+      - "是否剔除全额退款订单由 open_questions 决定"
+    dimensions:
+      - 注册渠道
+      - 地区
+      - 会员等级
+      - 首单月份
+      - 品类
+    time_window: "默认滚动 90 天;也可按自然月。观察窗口不足 90 天的 cohort 必须标注右删失。"
+    edge_cases:
+      - "观察期最后一个月入场的用户没有足够时间复购,复购率会被低估。"
+      - "同一天多笔订单按多笔计数,可能高估复购。"
+      - "全额退款订单是否算一次购买,需与 refund_rate 口径保持一致。"
+      - "新客首单必须计入分母,否则复购率失真。"
+    clock: "payment"
+    status: draft
+    open_questions:
+      - question: "复购观察窗口取多长?"
+        options:
+          - "滚动 90 天(当前公式)"
+          - "自然月内复购"
+          - "滚动 30 天"
+      - question: "全额退款订单是否算一次购买?"
+        options:
+          - "算,只要发生过支付"
+          - "不算,剔除已退款订单"
+      - question: "复购按订单口径还是品类口径?"
+        options:
+          - "订单口径:任意品类再下一单即算复购"
+          - "品类口径:同一品类再次购买才算复购"
+
+  - id: repurchase_interval
+    name: 复购间隔
+    category: 留存
+    formula: "对每个用户按支付时间排序,计算相邻两笔干净支付订单的天数差,报告中位数、P25 与 P75;只有一笔订单的用户不参与。"
+    grain: 用户级
+    required_columns:
+      - orders.用户ID
+      - orders.订单号
+      - orders.支付时间
+      - orders.订单日期
+      - orders.订单状态
+      - orders.是否测试单
+      - orders.是否刷单
+      - users.是否内部账号
+      - users.是否测试账号
+    filters:
+      - "排除测试单、刷单、内部账号、测试账号"
+      - "排除待支付与已取消订单"
+      - "同一支付时间多笔订单按订单号排序,间隔记为 0 天并单独报告"
+    dimensions:
+      - 会员等级
+      - 注册渠道
+      - 地区
+      - 首单月份
+      - 品类
+    time_window: "默认滚动 180 天,保证有足够复购样本。"
+    edge_cases:
+      - "只有一笔订单的用户不参与,报告必须写清参与用户数。"
+      - "同日多单产生 0 天间隔,会拉低中位数。"
+      - "首单→二单与全部相邻间隔是两种口径,默认用全部相邻间隔。"
+      - "观察期右删失会让长间隔被低估。"
+    clock: "payment"
+    status: draft
+    open_questions:
+      - question: "只算首单→二单,还是所有相邻订单?"
+        options:
+          - "所有相邻订单间隔(当前公式)"
+          - "只算首单→二单,衡量新客转化速度"
+      - question: "报中位数还是均值?"
+        options:
+          - "中位数 + P25/P75(当前公式,抗异常值)"
+          - "均值 + 标准差"
+      - question: "退款订单是否参与间隔计算?"
+        options:
+          - "不参与,只算干净支付订单(当前公式)"
+          - "参与,退款不影响下单间隔"
+
+  - id: new_customer_ratio
+    name: 新客占比
+    category: 结构
+    formula: "订单口径 = 新客支付订单数 / 支付订单数;用户口径 = 新客支付用户数 / 支付用户数。orders.新客 按「用户首笔干净支付订单」标记。"
+    grain: 订单级 / 用户级(双口径)
+    required_columns:
+      - orders.新客
+      - orders.订单号
+      - orders.用户ID
+      - orders.支付金额
+      - orders.订单状态
+      - orders.是否测试单
+      - orders.是否刷单
+      - users.注册日期
+    filters:
+      - "排除测试单、刷单、内部账号、测试账号"
+      - "只统计发生过支付的订单"
+    dimensions:
+      - 订单日期
+      - 渠道
+      - 品类
+      - 地区
+      - 会员等级
+    time_window: "默认自然月;新客标记依赖数据集内的历史订单,首次导入数据会天然偏高。"
+    edge_cases:
+      - "同一天多笔订单只有最早一笔标为新客,其余标为老客。"
+      - "用户首单退款后再次下单,仍按首单标记为新客,可能与直觉不符。"
+      - "跨渠道首单:以最早支付订单的渠道为准。"
+      - "数据集起点之前的历史订单未纳入,新客占比偏高。"
+    clock: "payment"
+    status: draft
+    open_questions:
+      - question: "新客占比用订单口径还是用户口径?"
+        options:
+          - "订单口径:新客支付订单数 / 支付订单数"
+          - "用户口径:新客支付用户数 / 支付用户数"
+          - "两者并列"
+      - question: "新客定义采用哪一种?"
+        options:
+          - "数据集内首笔干净支付订单(当前公式)"
+          - "注册后 30 天内首笔支付订单"
+          - "历史从未支付、本期首次支付"
+      - question: "是否剔除退款的新客订单?"
+        options:
+          - "不剔除,只要发生过支付"
+          - "剔除已退款订单"
+
+  - id: attach_rate
+    name: 连带率
+    category: 结构
+    formula: "SUM(order_items.数量)(orders.是否赠品 = 否 且订单属于干净支付订单)/ 干净支付订单数。"
+    grain: 订单级
+    required_columns:
+      - order_items.订单号
+      - order_items.数量
+      - order_items.是否赠品
+      - order_items.商品ID
+      - orders.订单号
+      - orders.订单状态
+      - orders.是否测试单
+      - orders.是否刷单
+    filters:
+      - "排除测试单、刷单订单对应的明细"
+      - "分母只含干净支付订单"
+      - "默认排除赠品明细"
+    dimensions:
+      - 渠道
+      - 品类
+      - 价格带
+      - 新客
+      - 会员等级
+    time_window: "默认自然月;必须与订单表使用同一时间窗口。"
+    edge_cases:
+      - "赠品是否计入件数存在争议,当前默认排除。"
+      - "0 元单只有赠品时,分母含该订单但分子为 0。"
+      - "同一 SKU 多件按数量累加,不是按 SKU 去重。"
+      - "退货明细缺失,无法计算净连带率。"
+    clock: "payment"
+    status: draft
+    open_questions:
+      - question: "连带率按件数还是按品类数?"
+        options:
+          - "件数:SUM(数量)/订单数"
+          - "品类数:每单不同品类个数 / 订单数"
+          - "SKU 去重数:每单不同商品ID个数 / 订单数"
+      - question: "赠品是否计入连带件数?"
+        options:
+          - "不计入(当前公式)"
+          - "计入,视为连带成交"
+      - question: "分母是否包含 0 元单?"
+        options:
+          - "包含(当前公式)"
+          - "剔除 0 元单,只看正常成交"
+
+  - id: cart_add_rate
+    name: 加购转化率
+    category: 转化
+    formula: "SUM(traffic.加购人数) / SUM(traffic.访问人数),可按日期、渠道、实验组聚合;分母为 0 时返回空值。"
+    grain: 日期×渠道×实验组
+    required_columns:
+      - traffic.日期
+      - traffic.渠道
+      - traffic.实验组
+      - traffic.访问人数
+      - traffic.加购人数
+    filters:
+      - "访问人数为 0 的行不参与计算"
+      - "同一日期、渠道、实验组只保留一行"
+      - "线下门店无加购行为的行按缺失处理,不按 0 参与"
+    dimensions:
+      - 日期
+      - 渠道
+      - 实验组
+      - 周
+      - 月
+    time_window: "默认按周;与支付转化率使用同一时间窗口。"
+    edge_cases:
+      - "加购人数可能包含重复加购,当前数据未去重。"
+      - "线下门店的加购人数由系统估算,口径与线上不同。"
+      - "曝光人数大于访问人数,不能反过来用曝光作分母去算加购率。"
+    clock: "event"
+    status: draft
+    open_questions:
+      - question: "加购转化率的分母用访问人数还是曝光人数?"
+        options:
+          - "访问人数(当前公式)"
+          - "曝光人数"
+      - question: "加购人数是否需要按用户去重?"
+        options:
+          - "按人次,直接汇总(当前数据口径)"
+          - "按用户去重,需要加购明细,当前数据未提供"
+      - question: "线下门店是否纳入加购转化率?"
+        options:
+          - "不纳入,只算线上渠道"
+          - "纳入但单独标注估算口径"

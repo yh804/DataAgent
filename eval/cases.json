@@ -1,0 +1,84 @@
+{
+  "cases": [
+    {
+      "id": "case_discover",
+      "question": "data/processed 目录下有哪些数据集？",
+      "checks": {
+        "final_contains": ["测试数据.csv"],
+        "final_not_empty": true
+      }
+    },
+    {
+      "id": "case_count_rows",
+      "question": "统计一下 测试数据.csv 的行数",
+      "checks": {
+        "summary_contains": ["800"],
+        "final_not_empty": true
+      }
+    },
+    {
+      "id": "case_income_mean",
+      "question": "计算 测试数据.csv 的收入均值",
+      "checks": {
+        "summary_contains": ["68.3"],
+        "final_not_empty": true
+      }
+    },
+    {
+      "id": "case_group_compare",
+      "question": "对比 测试数据.csv 中测试组和对照组的收入",
+      "checks": {
+        "final_contains": ["测试组", "对照组"],
+        "final_not_empty": true
+      }
+    },
+    {
+      "id": "case_income_distribution_chart",
+      "question": "看一下 测试数据.csv 的收入分布",
+      "checks": {
+        "final_not_empty": true,
+        "charts_min": 1
+      }
+    },
+    {
+      "id": "case_missing_file",
+      "question": "分析 不存在.csv 的行数",
+      "checks": {
+        "error_contains": ["数据集不可用", "不可重试"],
+        "final_not_empty": false
+      }
+    },
+    {
+      "id": "case_clarify",
+      "question": "今天天气怎么样？",
+      "checks": {
+        "messages_contains": ["意图不明确"],
+        "final_not_empty": true,
+        "final_contains": ["意图不明确"]
+      }
+    },
+    {
+      "id": "case_summary_sections",
+      "question": "统计一下 测试数据.csv 中测试组和对照组的平均收入",
+      "checks": {
+        "report_sections": [
+          "## 一句话结论",
+          "## 关键发现",
+          "## 建议",
+          "## 局限与数据质量",
+          "## 口径与数据版本"
+        ],
+        "final_not_empty": true
+      }
+    },
+    {
+      "id": "case_ab_significance",
+      "question": "分析 ab_data.csv 这个 AB 实验的转化率差异",
+      "checks": {
+        "summary_contains": ["p 值", "置信区间", "相对提升"],
+        "summary_not_contains": ["converted 异常值", "异常值(IQR) 235"],
+        "final_not_empty": true
+      }
+    }
+  ]
+}

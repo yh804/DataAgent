@@ -1,0 +1,35 @@
+# 生产依赖(最小集),版本全部锁定,保证换机器装完行为一致(构建规则 2.6)。
+# 升级依赖时请同步改版本号,并跑 eval/run_eval.py 回归。
+langgraph==1.2.16
+# SQLite 检查点：状态跨进程持久化(outputs/checkpoints.sqlite)
+langgraph-checkpoint-sqlite==3.1.2
+langchain-core==1.6.13
+langchain-openai==1.7.2
+pandas==3.0.6
+# stats.py 直接 import numpy,属直接依赖;锁版本避免与 pandas / scipy ABI 错配
+numpy==2.5.4
+openpyxl==3.1.5
+pydantic==2.14.1
+python-dotenv==1.2.4
+# Web 层(批次 D):FastAPI 后端 + SSE;单 worker 运行,见 web/run.py
+fastapi==0.162.0
+uvicorn==0.54.0
+# fastapi 处理 multipart 上传的硬依赖(POST /api/datasets)
+python-multipart==0.0.32
+# 统计分析入口(ask_stats.py)使用,仅主进程需要,沙箱镜像不安装
+scipy==1.18.1
+statsmodels==0.15.0
+# MySQL 连接(数据库问答)只在主进程使用,沙箱不安装、不连库
+pymysql==1.1.1
+# 可选：本机 brotli 解码兼容的临时 workaround(llm.py 里 try/except,装了才启用),
+# 不是项目必需依赖,其他机器可不装
+# httpx2==2.16.0
+# 可选：使用 E2B 云端沙箱后端时取消注释
+# e2b-code-interpreter
+# 可选：仅当需要分析老式 .xls 时取消注释
+# xlrd
+
+# Web 界面（web/）
+fastapi
+uvicorn[standard]
+python-multipart
